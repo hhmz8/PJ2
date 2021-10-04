@@ -16,6 +16,7 @@ runsim.c
 #include <unistd.h> //sleep
 
 // Reference: https://www.tutorialspoint.com/inter_process_communication/inter_process_communication_shared_memory.htm
+// Reference: https://stackoverflow.com/questions/19461744/how-to-make-parent-wait-for-all-child-processes-to-finish
 #define BUF_SIZE 1024
 #define SHM_KEY 806040
 #define MAX_PRO 20
@@ -29,6 +30,8 @@ struct shmseg {
 
 int main(int argc, char** argv) {
 	
+	int pid;
+	int status = 0;
 	int option = 0;
 	int licenseInput = 0;
 
@@ -58,7 +61,7 @@ int main(int argc, char** argv) {
 	}
 	
 	// Fork
-	int pid = fork();
+	pid = fork();
 	switch ( pid )
     {
 	case -1:
@@ -70,7 +73,7 @@ int main(int argc, char** argv) {
 	    break;
 
 	default:
-	    parent();
+	    parent(pid, status);
 	    break;
     }
 
@@ -82,7 +85,7 @@ void sigint(int sig){
 	exit(0);
 }
 
-void parent(){
+void parent(int pid, int status){
 	// Shared memory
 	struct shmseg *shmp;
 	int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
@@ -99,8 +102,11 @@ void parent(){
 	
 	shmp->nlicenses = 1;
 	
-	/* Deallocation
-	if (shmdt(str) == -1) {
+	// Wait for child processes to terminate
+	while ((pid = wait(&status)) > 0);
+	
+	//Deallocation
+	if (shmdt(shmp) == -1) {
 		perror("Error: shmdt");
 		return -1;
 	}
@@ -108,7 +114,7 @@ void parent(){
 		perror("Error: shmctl");
 		return -1;
 	}
-	*/
+	
 	
 	printf("End of parent.\n");
 }
@@ -117,7 +123,7 @@ void parent(){
 // Reference: https://www.geeksforgeeks.org/signals-c-set-2/
 void child(){
 	signal(SIGINT, sigint);
-	sleep ( 2 );
+	sleep(1);
 	
 	// Shared memory
 	struct shmseg *shmp;
@@ -130,10 +136,11 @@ void child(){
 	shmp = shmat(shmid, 0, 0);
 	if (shmp == (void *) -1){
 		perror("Error: shmat");
-		return -1;
+		exit(-1);
 	}
 	
 	printf("nlicenses: %d\n", shmp->nlicenses);
 
 	printf("End of child.\n");
+	exit(0);
 }

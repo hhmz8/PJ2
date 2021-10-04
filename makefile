@@ -9,7 +9,7 @@ all: runsim testsim
 	$(CC) $(CFLAGS) -c -o $@ $<
 	
 runsim: runsim.o
-	gcc $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 	
 testsim: testsim.o
-	gcc $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
