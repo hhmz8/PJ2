@@ -25,5 +25,5 @@ void parent(){
 }
 
 void child(){
-	
+
 }

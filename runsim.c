@@ -11,6 +11,7 @@ runsim.c
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/types.h>
+#include <signal.h>
 #include <ctype.h> //isprint
 #include <unistd.h> //sleep
 
@@ -21,9 +22,9 @@ runsim.c
 extern int errno;
 
 int main(int argc, char** argv) {
-
+	
 	int option = 0;
-	char* filename = malloc(200);
+	int nlicenses = 0;
 
 	// Reference: https://www.gnu.org/software/libc/manual/html_node/Example-of-Getopt.html
 	while ((option = getopt(argc, argv, "ht:")) != -1) {
@@ -44,14 +45,70 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 	if (optind < argc) {
-		filename = argv[optind];
+		nlicenses = atoi(argv[optind]);
 	}
 	else {
-		printf("Enter file name: \n");
-		scanf("%s",filename);
+		nlicenses = 1;
+	}
+	
+	// Shared memory
+	int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
+	if (shmid == -1) {
+		perror("Error: shmget");
+		return -1;
+	}
+	
+	char* str = (char*) shmat(shmid, 0, 0);
+	if (shmdt(str) == -1) {
+		perror("Error: shmdt");
+		return -1;
+	}
+	if (shmctl(shmid, IPC_RMID, 0) == -1) {
+		perror("Error: shmctl");
+		return -1;
+	}
+	
+	// Fork
+	int pid = fork();
+	switch ( pid )
+    {
+	case -1:
+	    perror("Error: fork");
+	    return -1;
+
+	case 0:
+	    child();
+	    break;
+
+	default:
+	    parent();
+	    break;
+    }
+
+	return 0;
+}
+
+void sigint(int sig){
+	printf("Child exited.\n");
+	exit(0);
+}
+
+void parent(){
+	printf("End of parent.\n");
+}
+
+// Reference: http://www.cs.umsl.edu/~sanjiv/classes/cs4760/src/shm.c
+// Reference: https://www.geeksforgeeks.org/signals-c-set-2/
+void child(){
+	signal(SIGINT, sigint);
+	sleep ( 2 );
+    int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
+	if (shmid == -1) {
+		perror("Error: shmget");
+		exit(-1);
 	}
 
-	printf("End of program.\n");
-	return 0;
+	char* str = (char*) shmat(shmid, 0, 0);
 
+	printf("End of child.\n");
 }
