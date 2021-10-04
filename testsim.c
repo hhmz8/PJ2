@@ -6,7 +6,6 @@ testsim.c
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <getopt.h>
 #include <errno.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>

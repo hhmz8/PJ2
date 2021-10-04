@@ -11,9 +11,12 @@ runsim.c
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/types.h>
+#include <sys/wait.h> //wait
 #include <signal.h>
 #include <ctype.h> //isprint
 #include <unistd.h> //sleep
+
+#include "runsim.h"
 
 // Reference: https://www.tutorialspoint.com/inter_process_communication/inter_process_communication_shared_memory.htm
 // Reference: https://stackoverflow.com/questions/19461744/how-to-make-parent-wait-for-all-child-processes-to-finish
@@ -91,13 +94,13 @@ void parent(int pid, int status){
 	int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
 	if (shmid == -1) {
 		perror("Error: shmget");
-		return -1;
+		exit(-1);
 	}
 	
 	shmp = shmat(shmid, 0, 0);
 	if (shmp == (void *) -1){
 		perror("Error: shmat");
-		return -1;
+		exit(-1);
 	}
 	
 	shmp->nlicenses = 1;
@@ -108,11 +111,11 @@ void parent(int pid, int status){
 	//Deallocation
 	if (shmdt(shmp) == -1) {
 		perror("Error: shmdt");
-		return -1;
+		exit(-1);
 	}
 	if (shmctl(shmid, IPC_RMID, 0) == -1) {
 		perror("Error: shmctl");
-		return -1;
+		exit(-1);
 	}
 	
 	

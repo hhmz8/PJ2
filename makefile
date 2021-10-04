@@ -1,11 +1,13 @@
 CC = gcc
 CFLAGS = -Wall
-DEPS = testsim.c runsim.c
 OBJ = testsim.o runsim.o
 
 all: runsim testsim
 
-%.o: %.c $(DEPS)
+runsim.o: runsim.c runsim.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+	
+testsim.o: testsim.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 	
 runsim: runsim.o
