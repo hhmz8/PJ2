@@ -24,7 +24,7 @@ runsim.c
 #define BUF_SIZE 1024
 #define SHM_KEY 806040
 #define MAX_PRO 20
-#define MAX_TIME 20
+#define MAX_TIME 10
 
 extern int errno;
 
@@ -35,10 +35,10 @@ struct shmseg {
 
 int main(int argc, char** argv) {
 	
+	int temp_i;
 	int pid;
-	int status = 0;
 	int option = 0;
-	int licenseInput = 0;
+	int licenseLimit = 0;
 
 	// Reference: https://www.gnu.org/software/libc/manual/html_node/Example-of-Getopt.html
 	while ((option = getopt(argc, argv, "ht:")) != -1) {
@@ -59,13 +59,19 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 	if (optind < argc) {
-		licenseInput = atoi(argv[optind]);
+		licenseLimit = atoi(argv[optind]);
 	}
 	else {
-		licenseInput = 1;
+		printf("Defaulting license # to 1.\n");
+		licenseLimit = 1;
 	}
-	
+	/*
 	// Fork
+	for (temp_i = 0; temp_i < licenseLimit; temp_i++){
+		pid = fork();
+	}
+	*/
+	
 	pid = fork();
 	switch ( pid )
     {
@@ -78,46 +84,42 @@ int main(int argc, char** argv) {
 	    break;
 
 	default:
-	    parent(pid, status);
+	    parent();
 	    break;
     }
-
+	
 	return 0;
 }
 
 void sigint(int sig){
-	printf("Child %d exited.\n",getpid());
+	printf("Parent process %d exiting...\n",getpid());
+	deallocate();
+	kill(0, SIGINT);
 	exit(0);
 }
 
 void sigalrm(int sig){
 	printf("Program timed out.\n");
 	deallocate();
+	kill(0, SIGINT);
 	exit(0);
 }
 
-void parent(int pid, int status){
+void parent(){
+	signal(SIGINT, sigint);
 	signal(SIGALRM, sigalrm);
 	alarm(MAX_TIME);
 	
-	// Shared memory
-	struct shmseg *shmp;
-	int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
-	if (shmid == -1) {
-		perror("Error: shmget");
-		exit(-1);
-	}
+	initlicense();
 	
-	shmp = shmat(shmid, 0, 0);
-	if (shmp == (void *) -1){
-		perror("Error: shmat");
-		exit(-1);
-	}
-	
-	shmp->nlicenses = 1;
-	
+	// Reference: Example 3.13 in the textbook
 	// Wait for child processes to terminate
-	while ((pid = wait(&status)) > 0);
+	sleep(1);
+	
+	printf("Waiting for child...\n");
+	int childpid;
+	while ((childpid = (wait(NULL))) > 0);
+	printf("Stopped waiting for child.\n");
 	
 	//Deallocation
 	deallocate();
@@ -128,8 +130,8 @@ void parent(int pid, int status){
 // Reference: http://www.cs.umsl.edu/~sanjiv/classes/cs4760/src/shm.c
 // Reference: https://www.geeksforgeeks.org/signals-c-set-2/
 void child(){
-	signal(SIGINT, sigint);
-	sleep(8);
+	printf("Child %d forked.\n",getpid());
+	sleep(3);
 	
 	// Shared memory
 	struct shmseg *shmp;
@@ -140,14 +142,11 @@ void child(){
 	}
 
 	shmp = shmat(shmid, 0, 0);
-	if (shmp == (void *) -1){
-		perror("Error: shmat");
-		exit(-1);
-	}
 	
 	printf("nlicenses: %d\n", shmp->nlicenses);
 
 	printf("End of child.\n");
+	exit(0);
 }
 
 void deallocate(){
@@ -158,10 +157,7 @@ void deallocate(){
 		exit(-1);
 	}
 	shmp = shmat(shmid, 0, 0);
-	if (shmp == (void *) -1){
-		perror("Error: shmat");
-		exit(-1);
-	}
+	
 	if (shmdt(shmp) == -1) {
 		perror("Error: shmdt");
 		exit(-1);
@@ -170,5 +166,49 @@ void deallocate(){
 		perror("Error: shmctl");
 		exit(-1);
 	}
-	kill(0, SIGINT);
+	printf("Shared memory deallocated.\n");
+}
+
+void returnlicense(){
+	struct shmseg *shmp;
+    int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
+	if (shmid == -1) {
+		perror("Error: shmget");
+		exit(-1);
+	}
+	shmp = shmat(shmid, 0, 0);
+	shmp->nlicenses++;
+}
+
+void initlicense(){
+	struct shmseg *shmp;
+    int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
+	if (shmid == -1) {
+		perror("Error: shmget");
+		exit(-1);
+	}
+	shmp = shmat(shmid, 0, 0);
+	shmp->nlicenses = 0;
+}
+
+void addtolicenses(int n){
+	struct shmseg *shmp;
+    int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
+	if (shmid == -1) {
+		perror("Error: shmget");
+		exit(-1);
+	}
+	shmp = shmat(shmid, 0, 0);
+	shmp->nlicenses += n;
+}
+
+void removelicenses(int n){
+	struct shmseg *shmp;
+    int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
+	if (shmid == -1) {
+		perror("Error: shmget");
+		exit(-1);
+	}
+	shmp = shmat(shmid, 0, 0);
+	shmp->nlicenses -= n;
 }

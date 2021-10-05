@@ -5,6 +5,10 @@ runsim.h
 */
 
 void sigint(int sig);
-void parent(int pid, int status);
+void parent();
 void child();
 void deallocate();
+void returnlicense();
+void initlicense();
+void addtolicenses(int n);
+void removelicenses(int n);
