@@ -7,3 +7,4 @@ runsim.h
 void sigint(int sig);
 void parent(int pid, int status);
 void child();
+void deallocate();

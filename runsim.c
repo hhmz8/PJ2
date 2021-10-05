@@ -11,10 +11,11 @@ runsim.c
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/types.h>
+#include <time.h> //time
 #include <sys/wait.h> //wait
 #include <signal.h>
 #include <ctype.h> //isprint
-#include <unistd.h> //sleep
+#include <unistd.h> //sleep, alarm
 
 #include "runsim.h"
 
@@ -23,6 +24,7 @@ runsim.c
 #define BUF_SIZE 1024
 #define SHM_KEY 806040
 #define MAX_PRO 20
+#define MAX_TIME 20
 
 extern int errno;
 
@@ -84,11 +86,20 @@ int main(int argc, char** argv) {
 }
 
 void sigint(int sig){
-	printf("Child exited.\n");
+	printf("Child %d exited.\n",getpid());
+	exit(0);
+}
+
+void sigalrm(int sig){
+	printf("Program timed out.\n");
+	deallocate();
 	exit(0);
 }
 
 void parent(int pid, int status){
+	signal(SIGALRM, sigalrm);
+	alarm(MAX_TIME);
+	
 	// Shared memory
 	struct shmseg *shmp;
 	int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
@@ -109,15 +120,7 @@ void parent(int pid, int status){
 	while ((pid = wait(&status)) > 0);
 	
 	//Deallocation
-	if (shmdt(shmp) == -1) {
-		perror("Error: shmdt");
-		exit(-1);
-	}
-	if (shmctl(shmid, IPC_RMID, 0) == -1) {
-		perror("Error: shmctl");
-		exit(-1);
-	}
-	
+	deallocate();
 	
 	printf("End of parent.\n");
 }
@@ -126,7 +129,7 @@ void parent(int pid, int status){
 // Reference: https://www.geeksforgeeks.org/signals-c-set-2/
 void child(){
 	signal(SIGINT, sigint);
-	sleep(1);
+	sleep(8);
 	
 	// Shared memory
 	struct shmseg *shmp;
@@ -145,5 +148,27 @@ void child(){
 	printf("nlicenses: %d\n", shmp->nlicenses);
 
 	printf("End of child.\n");
-	exit(0);
+}
+
+void deallocate(){
+	struct shmseg *shmp;
+    int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
+	if (shmid == -1) {
+		perror("Error: shmget");
+		exit(-1);
+	}
+	shmp = shmat(shmid, 0, 0);
+	if (shmp == (void *) -1){
+		perror("Error: shmat");
+		exit(-1);
+	}
+	if (shmdt(shmp) == -1) {
+		perror("Error: shmdt");
+		exit(-1);
+	}
+	if (shmctl(shmid, IPC_RMID, 0) == -1) {
+		perror("Error: shmctl");
+		exit(-1);
+	}
+	kill(0, SIGINT);
 }
