@@ -30,12 +30,15 @@ extern int errno;
 
 struct shmseg {
    int nlicenses;
+   int choosing[MAX_PRO]; //Boolean
+   int numbers[MAX_PRO]; //Turn #
    char buf[BUF_SIZE];
 };
 
 int main(int argc, char** argv) {
 	
 	int i;
+	int id = 0;
 	int pid;
 	int option = 0;
 	int licenseLimit = 0;
@@ -69,6 +72,7 @@ int main(int argc, char** argv) {
 	// Fork
 	for (i = 0; i < licenseLimit; i++){
 		pid = fork();
+		id++; // Temporary process number
 		switch ( pid )
 		{
 		case -1:
@@ -76,7 +80,7 @@ int main(int argc, char** argv) {
 			return -1;
 
 		case 0:
-			child();
+			child(id);
 			break;
 
 		default:
@@ -108,7 +112,7 @@ void parent(){
 	signal(SIGALRM, sigalrm);
 	alarm(MAX_TIME);
 	
-	initlicense();
+	initlicense(license());
 	
 	// Reference: Example 3.13 in the textbook
 	// Wait for child processes to terminate
@@ -127,8 +131,8 @@ void parent(){
 
 // Reference: http://www.cs.umsl.edu/~sanjiv/classes/cs4760/src/shm.c
 // Reference: https://www.geeksforgeeks.org/signals-c-set-2/
-void child(){
-	printf("Child %d forked from parent %d.\n",getpid(), getppid());
+void child(int id){
+	printf("Child %d with id # %d forked from parent %d.\n",getpid(), id, getppid());
 	
 	// Shared memory
 	struct shmseg *shmp;
@@ -143,8 +147,31 @@ void child(){
 	
 	printf("nlicenses: %d\n", shmp->nlicenses);
 
+	// Reference: Lecture video, https://www.geeksforgeeks.org/bakery-algorithm-in-process-synchronization/
+	// Bakery algorithm 
+	int i;
+	int j;
+	int number;
+	int max_number;
+	shmp->choosing[id] = 1;
+	for (i = 0; i < MAX_PRO; ++i) {
+		number = shmp->numbers[i];
+		max_number = number > max_number ? number : max_number;
+	}
+	shmp->numbers[id] = max_number + 1;
+	shmp->choosing[id] = 0;
+	printf("Child %d with number %d.\n",getpid(), shmp->numbers[id]);
+	for (j = 0; j < MAX_PRO; j++) {
+		while (shmp->choosing[j] == 1);
+		while ((shmp->numbers[j] != 0) && (shmp->numbers[j] < shmp->numbers[i] || (shmp->numbers[j] == shmp->numbers[i] && j < i)));
+	}
+	
+	// Critical Section
 	docommand();
-	printf("End of child.\n");
+	// End 
+	shmp->numbers[id] = 0;
+	
+	printf("Child %d finished.\n", getpid());
 	exit(0);
 }
 
@@ -183,39 +210,29 @@ void returnlicense(struct shmseg* shmp){
 	shmp->nlicenses++;
 }
 
-void initlicense(){
-	struct shmseg *shmp;
-    int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
-	if (shmid == -1) {
-		perror("Error: shmget");
-		exit(-1);
-	}
-	shmp = shmat(shmid, 0, 0);
+void initlicense(struct shmseg* shmp){
 	shmp->nlicenses = 0;
+	int i;
+	for (i = 0; i < MAX_PRO; i++) {
+		shmp->choosing[i] = 0;
+		shmp->numbers[i] = 0;
+	}
 }
 
-void addtolicenses(int n){
-	struct shmseg *shmp;
-    int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
-	if (shmid == -1) {
-		perror("Error: shmget");
-		exit(-1);
-	}
-	shmp = shmat(shmid, 0, 0);
+void addtolicenses(struct shmseg* shmp, int n){
 	shmp->nlicenses += n;
 }
 
-void removelicenses(int n){
-	struct shmseg *shmp;
-    int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
-	if (shmid == -1) {
-		perror("Error: shmget");
-		exit(-1);
-	}
-	shmp = shmat(shmid, 0, 0);
+void removelicenses(struct shmseg* shmp, int n){
 	shmp->nlicenses -= n;
 }
 
 void docommand(){
-	execl("testsim", "testsim", "1", "1", (char*)NULL);
+	char arg1[20];
+	char arg2[20];
+	char arg3[20];
+	fscanf(stdin, "%s", arg1);
+	fscanf(stdin, "%s", arg2);
+	fscanf(stdin, "%s", arg3);
+	execl(arg1, "docommand", arg2, arg3, (char*)NULL);
 }

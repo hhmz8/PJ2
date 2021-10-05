@@ -6,11 +6,11 @@ runsim.h
 
 void sigint(int sig);
 void parent();
-void child();
+void child(int id);
 void deallocate();
 struct shmseg* license();
 void returnlicense(struct shmseg* shmp);
-void initlicense();
-void addtolicenses(int n);
-void removelicenses(int n);
+void initlicense(struct shmseg* shmp);
+void addtolicenses(struct shmseg* shmp, int n);
+void removelicenses(struct shmseg* shmp, int n);
 void docommand();

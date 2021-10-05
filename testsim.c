@@ -32,6 +32,5 @@ int main(int argc, char** argv){
 		strftime(timeBuffer, 40, "%H:%M:%S", localtime(&tempTime));
 		printf("%s %d %d of %d iterations\n", timeBuffer, pid, (i+1), repeat);
 	}
-	printf("End of testsim.\n");
 	return 0;
 }
