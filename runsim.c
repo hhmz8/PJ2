@@ -24,7 +24,7 @@ runsim.c
 #define BUF_SIZE 1024
 #define SHM_KEY 806040
 #define MAX_PRO 20
-#define MAX_TIME 10
+#define MAX_TIME 60
 
 extern int errno;
 
@@ -35,7 +35,7 @@ struct shmseg {
 
 int main(int argc, char** argv) {
 	
-	int temp_i;
+	int i;
 	int pid;
 	int option = 0;
 	int licenseLimit = 0;
@@ -65,28 +65,26 @@ int main(int argc, char** argv) {
 		printf("Defaulting license # to 1.\n");
 		licenseLimit = 1;
 	}
-	/*
-	// Fork
-	for (temp_i = 0; temp_i < licenseLimit; temp_i++){
-		pid = fork();
-	}
-	*/
 	
-	pid = fork();
-	switch ( pid )
-    {
-	case -1:
-	    perror("Error: fork");
-	    return -1;
+	// Fork
+	for (i = 0; i < licenseLimit; i++){
+		pid = fork();
+		switch ( pid )
+		{
+		case -1:
+			perror("Error: fork");
+			return -1;
 
-	case 0:
-	    child();
-	    break;
+		case 0:
+			child();
+			break;
 
-	default:
-	    parent();
-	    break;
-    }
+		default:
+			break;
+		}
+	}
+	
+	parent();
 	
 	return 0;
 }
@@ -130,8 +128,7 @@ void parent(){
 // Reference: http://www.cs.umsl.edu/~sanjiv/classes/cs4760/src/shm.c
 // Reference: https://www.geeksforgeeks.org/signals-c-set-2/
 void child(){
-	printf("Child %d forked.\n",getpid());
-	sleep(3);
+	printf("Child %d forked from parent %d.\n",getpid(), getppid());
 	
 	// Shared memory
 	struct shmseg *shmp;
@@ -142,9 +139,11 @@ void child(){
 	}
 
 	shmp = shmat(shmid, 0, 0);
+	returnlicense(license());
 	
 	printf("nlicenses: %d\n", shmp->nlicenses);
 
+	docommand();
 	printf("End of child.\n");
 	exit(0);
 }
@@ -169,7 +168,7 @@ void deallocate(){
 	printf("Shared memory deallocated.\n");
 }
 
-void returnlicense(){
+struct shmseg* license(){
 	struct shmseg *shmp;
     int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
 	if (shmid == -1) {
@@ -177,6 +176,10 @@ void returnlicense(){
 		exit(-1);
 	}
 	shmp = shmat(shmid, 0, 0);
+	return shmp;
+}
+
+void returnlicense(struct shmseg* shmp){
 	shmp->nlicenses++;
 }
 
@@ -211,4 +214,8 @@ void removelicenses(int n){
 	}
 	shmp = shmat(shmid, 0, 0);
 	shmp->nlicenses -= n;
+}
+
+void docommand(){
+	execl("testsim", "testsim", "1", "1", (char*)NULL);
 }
