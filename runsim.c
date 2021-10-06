@@ -60,12 +60,10 @@ int main(int argc, char** argv) {
 	int pid = 1;
 	int option = 0;
 	int licenseLimit = 0;
-	char arg1[MAX_CHAR];
-	char arg2[MAX_CHAR];
-	char arg3[MAX_CHAR];
-	fscanf(stdin, "%s", arg1);
-	fscanf(stdin, "%s", arg2);
-	fscanf(stdin, "%s", arg3);
+	char arg[3][MAX_CHAR];
+	fscanf(stdin, "%s", arg[0]);
+	fscanf(stdin, "%s", arg[1]);
+	fscanf(stdin, "%s", arg[2]);
 	
 	// Clear log file
 	fptr = fopen(OUT_FILE, "w");
@@ -116,7 +114,7 @@ int main(int argc, char** argv) {
 			return -1;
 
 		case 0: // Child, terminates
-			child(id, arg1, arg2, arg3);
+			child(id, arg[0], arg[1], arg[2]);
 			break;
 
 		default: // Parent, loops
@@ -127,22 +125,23 @@ int main(int argc, char** argv) {
 					break;
 				}
 			}
-			fscanf(stdin, "%s", arg1);
-			fscanf(stdin, "%s", arg2);
-			fscanf(stdin, "%s", arg3);
+			// Get next inputs
+			for (i = 0; i < 3; i++){
+				if (fscanf(stdin, "%s", arg[i]) == EOF){
+					// EOF 
+					printf("End of file reached.\n");
+					parent();
+					deallocate();
+					return 0;
+				}
+			}
 			break;
 		}
 	}
-	
-	// EOF 
-	parent();
-	//Deallocation
-	deallocate();
-	
-	printf("End of parent.\n");
 	return 0;
 }
 
+// Parent function to wait for children processes
 void parent(){
 	printf("Waiting for children...\n");
 	int childpid;
