@@ -15,3 +15,6 @@ runsim: runsim.o
 	
 testsim: testsim.o
 	$(CC) $(CFLAGS) -o $@ $^
+	
+clean:
+	rm *.h *.c *.o
