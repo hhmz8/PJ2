@@ -26,12 +26,33 @@ extern int errno;
 
 struct shmseg {
    int nlicenses;
+   int avaliable[MAX_PRO]; //Boolean
    int choosing[MAX_PRO]; //Boolean
    int numbers[MAX_PRO]; //Turn #
    char buf[BUF_SIZE];
 };
 
+void sigint(int sig){
+	printf("Parent process %d exiting...\n",getpid());
+	parent();
+	deallocate();
+	//kill(0, SIGINT);
+	exit(0);
+}
+
+void sigalrm(int sig){
+	printf("Program timed out.\n");
+	parent();
+	deallocate();
+	//kill(0, SIGINT);
+	exit(0);
+}
+
 int main(int argc, char** argv) {
+	// Signal handlers;
+	signal(SIGINT, sigint);
+	signal(SIGALRM, sigalrm);
+	alarm(MAX_TIME);
 	
 	FILE* fptr;
 	int i;
@@ -79,8 +100,14 @@ int main(int argc, char** argv) {
 	// Init 
 	initlicense(license(), licenseLimit);
 	
-	// Fork
-	for (i = 0; i < licenseLimit; i++){
+	// Fork loop
+	while(1){
+		// Request license
+		getlicense(license());
+		removelicenses(license(),1);
+		printf("Fetched license. Remaining licenses: %d\n", license()->nlicenses);
+		license()->avaliable[id] = 0;
+		
 		pid = fork();
 		switch ( pid )
 		{
@@ -88,12 +115,18 @@ int main(int argc, char** argv) {
 			perror("Error: fork");
 			return -1;
 
-		case 0:
+		case 0: // Child, terminates
 			child(id, arg1, arg2, arg3);
 			break;
 
-		default:
-			id++;
+		default: // Parent, loops
+			// Get empty bakery id
+			for (i = 0; i < MAX_PRO; i++){
+				if (license()->avaliable[i] == 1){
+					id = i;
+					break;
+				}
+			}
 			fscanf(stdin, "%s", arg1);
 			fscanf(stdin, "%s", arg2);
 			fscanf(stdin, "%s", arg3);
@@ -103,47 +136,26 @@ int main(int argc, char** argv) {
 	
 	// EOF 
 	parent();
-	
-	return 0;
-}
-
-void sigint(int sig){
-	printf("Parent process %d exiting...\n",getpid());
-	deallocate();
-	kill(0, SIGINT);
-	exit(0);
-}
-
-void sigalrm(int sig){
-	printf("Program timed out.\n");
-	deallocate();
-	kill(0, SIGINT);
-	exit(0);
-}
-
-void parent(){
-	signal(SIGINT, sigint);
-	signal(SIGALRM, sigalrm);
-	alarm(MAX_TIME);
-	
-	// Reference: Example 3.13 in the textbook
-	// Wait for child processes to terminate
-	sleep(1);
-	
-	printf("Waiting for child...\n");
-	int childpid;
-	while ((childpid = (wait(NULL))) > 0);
-	printf("Stopped waiting for child.\n");
-	
 	//Deallocation
 	deallocate();
 	
 	printf("End of parent.\n");
+	return 0;
+}
+
+void parent(){
+	printf("Waiting for children...\n");
+	int childpid;
+	while ((childpid = (wait(NULL))) > 0);
+	printf("Stopped waiting for children.\n");
 }
 
 // Reference: http://www.cs.umsl.edu/~sanjiv/classes/cs4760/src/shm.c
 // Reference: https://www.geeksforgeeks.org/signals-c-set-2/
 void child(int id, char* arg1, char* arg2, char* arg3){
+	signal(SIGINT, SIG_IGN);
+	signal(SIGALRM, SIG_IGN);
+	
 	printf("Child %d with id # %d forked from parent %d.\n",getpid(), id, getppid());
 	
 	// Shared memory
@@ -175,11 +187,14 @@ void child(int id, char* arg1, char* arg2, char* arg3){
 		while ((shmp->numbers[j] != 0) && (shmp->numbers[j] < shmp->numbers[id] || (shmp->numbers[j] == shmp->numbers[id] && j < id)));
 	}
 	
-	// Critical Section
+	// Critical section
 	docommand(arg1, arg2, arg3);
-	// End 
+	// Critical secion, end 
 	shmp->numbers[id] = 0;
+	shmp->avaliable[id] = 1;
 	
+	// Return license
+	returnlicense(license());
 	printf("Child %d finished.\n", getpid());
 	exit(0);
 }
@@ -235,6 +250,7 @@ void initlicense(struct shmseg* shmp, int n){
 	shmp->nlicenses = n;
 	int i;
 	for (i = 0; i < MAX_PRO; i++) {
+		shmp->avaliable[i] = 1;
 		shmp->choosing[i] = 0;
 		shmp->numbers[i] = 0;
 	}
@@ -250,13 +266,8 @@ void removelicenses(struct shmseg* shmp, int n){
 	shmp->nlicenses -= n;
 }
 
-// Runs testsim & various license functions
+// Runs testsim
 void docommand(char* arg1, char* arg2, char* arg3){
-	// Request license
-	getlicense(license());
-	removelicenses(license(),1);
-	printf("Fetched license. Remaining licenses: %d\n", license()->nlicenses);
-	
 	int pid;
 	int childpid;
 	
@@ -280,7 +291,4 @@ void docommand(char* arg1, char* arg2, char* arg3){
 	
 	// Wait for grandchild execl 
 	while ((childpid = (wait(NULL))) > 0);
-	
-	// Return license
-	returnlicense(license());
 }
