@@ -38,10 +38,16 @@ struct shmseg {
 int main(int argc, char** argv) {
 	
 	int i;
-	int id = 0;
+	int id = -1;
 	int pid;
 	int option = 0;
 	int licenseLimit = 0;
+	char arg1[20];
+	char arg2[20];
+	char arg3[20];
+	fscanf(stdin, "%s", arg1);
+	fscanf(stdin, "%s", arg2);
+	fscanf(stdin, "%s", arg3);
 
 	// Reference: https://www.gnu.org/software/libc/manual/html_node/Example-of-Getopt.html
 	while ((option = getopt(argc, argv, "ht:")) != -1) {
@@ -71,8 +77,12 @@ int main(int argc, char** argv) {
 	
 	// Fork
 	for (i = 0; i < licenseLimit; i++){
+		printf("Forking child with parameters: %s %s %s.\n", arg1, arg2, arg3);
 		pid = fork();
 		id++; // Temporary process number
+		fscanf(stdin, "%s", arg1);
+		fscanf(stdin, "%s", arg2);
+		fscanf(stdin, "%s", arg3);
 		switch ( pid )
 		{
 		case -1:
@@ -80,7 +90,7 @@ int main(int argc, char** argv) {
 			return -1;
 
 		case 0:
-			child(id);
+			child(id, arg1, arg2, arg3);
 			break;
 
 		default:
@@ -131,7 +141,7 @@ void parent(){
 
 // Reference: http://www.cs.umsl.edu/~sanjiv/classes/cs4760/src/shm.c
 // Reference: https://www.geeksforgeeks.org/signals-c-set-2/
-void child(int id){
+void child(int id, char* arg1, char* arg2, char* arg3){
 	printf("Child %d with id # %d forked from parent %d.\n",getpid(), id, getppid());
 	
 	// Shared memory
@@ -151,23 +161,23 @@ void child(int id){
 	// Bakery algorithm 
 	int i;
 	int j;
-	int number;
-	int max_number;
+	int max_number = shmp->numbers[0];
 	shmp->choosing[id] = 1;
-	for (i = 0; i < MAX_PRO; ++i) {
-		number = shmp->numbers[i];
-		max_number = number > max_number ? number : max_number;
+	for (i = 0; i < MAX_PRO; i++) {
+		if (shmp->numbers[i] > max_number){
+			max_number = shmp->numbers[i];
+		}
 	}
 	shmp->numbers[id] = max_number + 1;
 	shmp->choosing[id] = 0;
-	printf("Child %d with number %d.\n",getpid(), shmp->numbers[id]);
 	for (j = 0; j < MAX_PRO; j++) {
+		//printf("Child %d with # of %d, testing process %d with # of %d. While: %d \n",getpid(), shmp->numbers[id], j, shmp->numbers[j], (shmp->numbers[j] < shmp->numbers[id]));
 		while (shmp->choosing[j] == 1);
-		while ((shmp->numbers[j] != 0) && (shmp->numbers[j] < shmp->numbers[i] || (shmp->numbers[j] == shmp->numbers[i] && j < i)));
+		while ((shmp->numbers[j] != 0) && (shmp->numbers[j] < shmp->numbers[id] || (shmp->numbers[j] == shmp->numbers[id] && j < id)));
 	}
 	
 	// Critical Section
-	docommand();
+	docommand(arg1, arg2, arg3);
 	// End 
 	shmp->numbers[id] = 0;
 	
@@ -227,12 +237,28 @@ void removelicenses(struct shmseg* shmp, int n){
 	shmp->nlicenses -= n;
 }
 
-void docommand(){
-	char arg1[20];
-	char arg2[20];
-	char arg3[20];
-	fscanf(stdin, "%s", arg1);
-	fscanf(stdin, "%s", arg2);
-	fscanf(stdin, "%s", arg3);
-	execl(arg1, "docommand", arg2, arg3, (char*)NULL);
+void docommand(char* arg1, char* arg2, char* arg3){
+	
+	int pid;
+	int childpid;
+	
+	pid = fork();
+	switch ( pid )
+	{
+	case -1:
+		perror("Error: fork");
+		exit(-1);
+
+	case 0:
+		if ((execl(arg1, "docommand", arg2, arg3, (char*)NULL)) == -1){
+			perror("Error: execl");
+		}
+		exit(-1);
+		break;
+
+	default:
+		break;
+	}
+	
+	while ((childpid = (wait(NULL))) > 0);
 }
