@@ -21,11 +21,6 @@ runsim.c
 
 // Reference: https://www.tutorialspoint.com/inter_process_communication/inter_process_communication_shared_memory.htm
 // Reference: https://stackoverflow.com/questions/19461744/how-to-make-parent-wait-for-all-child-processes-to-finish
-#define BUF_SIZE 1024
-#define SHM_KEY 806040
-#define MAX_PRO 20
-#define MAX_TIME 60
-#define OUT_FILE "logfile"
 
 extern int errno;
 
@@ -40,13 +35,13 @@ int main(int argc, char** argv) {
 	
 	FILE* fptr;
 	int i;
-	int id = -1;
-	int pid;
+	int id = 0;
+	int pid = 1;
 	int option = 0;
 	int licenseLimit = 0;
-	char arg1[20];
-	char arg2[20];
-	char arg3[20];
+	char arg1[MAX_CHAR];
+	char arg2[MAX_CHAR];
+	char arg3[MAX_CHAR];
 	fscanf(stdin, "%s", arg1);
 	fscanf(stdin, "%s", arg2);
 	fscanf(stdin, "%s", arg3);
@@ -87,10 +82,6 @@ int main(int argc, char** argv) {
 	// Fork
 	for (i = 0; i < licenseLimit; i++){
 		pid = fork();
-		id++; // Temporary process number
-		fscanf(stdin, "%s", arg1);
-		fscanf(stdin, "%s", arg2);
-		fscanf(stdin, "%s", arg3);
 		switch ( pid )
 		{
 		case -1:
@@ -102,10 +93,15 @@ int main(int argc, char** argv) {
 			break;
 
 		default:
+			id++;
+			fscanf(stdin, "%s", arg1);
+			fscanf(stdin, "%s", arg2);
+			fscanf(stdin, "%s", arg3);
 			break;
 		}
 	}
 	
+	// EOF 
 	parent();
 	
 	return 0;
