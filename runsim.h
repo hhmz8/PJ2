@@ -6,13 +6,16 @@ runsim.h
 #ifndef RUNSIM_H
 #define RUNSIM_H
 
+void logexit();
 void sigint_parent(int sig);
 void sigint(int sig);
 void sigalrm(int sig);
+
 void parent();
 void child(int id, char* arg1, char* arg2, char* arg3);
 void deallocate();
 struct shmseg* license();
+
 void getlicense(struct shmseg* shmp);
 void returnlicense(struct shmseg* shmp);
 void initlicense(struct shmseg* shmp, int n);

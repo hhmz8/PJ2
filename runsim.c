@@ -32,29 +32,6 @@ struct shmseg {
    char buf[BUF_SIZE];
 };
 
-void sigint_parent(int sig){
-	printf("Process %d exiting...\n",getpid());
-	deallocate();
-	printf("Terminating child processes...\n");
-	kill(0, SIGINT);
-	parent();
-	exit(0);
-}
-
-void sigint(int sig){
-	kill(0, SIGINT);
-	exit(0);
-}
-
-void sigalrm(int sig){
-	printf("Program timed out.\n");
-	deallocate();
-	printf("Terminating child processes...\n");
-	kill(0, SIGINT);
-	parent();
-	exit(0);
-}
-
 int main(int argc, char** argv) {
 	// Signal handlers;
 	signal(SIGINT, sigint_parent);
@@ -143,13 +120,51 @@ int main(int argc, char** argv) {
 					printf("End of file reached.\n");
 					parent();
 					deallocate();
+					logexit();
 					return 0;
 				}
 			}
 			break;
 		}
 	}
-	return 0;
+	logexit();
+	return -1;
+}
+
+// Logs termination time
+void logexit(){
+	FILE* fptr;
+	char timeBuffer[40];
+	time_t tempTime = time(NULL);
+	fptr = fopen(OUT_FILE, "a");
+	strftime(timeBuffer, 40, "%H:%M:%S", localtime(&tempTime));
+	fprintf(fptr, "%s %d terminated\n", timeBuffer, getpid());
+	fclose(fptr);
+}
+
+void sigint_parent(int sig){
+	printf("Process %d exiting...\n",getpid());
+	deallocate();
+	printf("Terminating child processes...\n");
+	kill(0, SIGINT);
+	parent();
+	logexit();
+	exit(0);
+}
+
+void sigint(int sig){
+	kill(0, SIGINT);
+	exit(0);
+}
+
+void sigalrm(int sig){
+	printf("Program timed out.\n");
+	deallocate();
+	printf("Terminating child processes...\n");
+	kill(0, SIGINT);
+	parent();
+	logexit();
+	exit(0);
 }
 
 // Parent function to wait for children processes
@@ -245,7 +260,7 @@ struct shmseg* license(){
 // Blocks process until a license is avaliable
 void getlicense(struct shmseg* shmp){
 	if (shmp->nlicenses < 1){
-		printf("Child %d waiting for avaliable license...\n", getpid());
+		printf("%d waiting for avaliable license...\n", getpid());
 		while(shmp->nlicenses < 1);
 	}
 }
@@ -290,7 +305,7 @@ void docommand(char* arg1, char* arg2, char* arg3){
 
 	case 0:
 		if ((execl(arg1, "docommand", arg2, arg3, (char*)NULL)) == -1){
-			perror("Error: execl");
+			perror("Error: execl/stdin");
 		}
 		exit(-1);
 		break;
