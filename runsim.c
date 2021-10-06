@@ -81,6 +81,9 @@ int main(int argc, char** argv) {
 		licenseLimit = 1;
 	}
 	
+	// Init 
+	initlicense(license(), licenseLimit);
+	
 	// Fork
 	for (i = 0; i < licenseLimit; i++){
 		pid = fork();
@@ -127,8 +130,6 @@ void parent(){
 	signal(SIGALRM, sigalrm);
 	alarm(MAX_TIME);
 	
-	initlicense(license());
-	
 	// Reference: Example 3.13 in the textbook
 	// Wait for child processes to terminate
 	sleep(1);
@@ -158,9 +159,6 @@ void child(int id, char* arg1, char* arg2, char* arg3){
 	}
 
 	shmp = shmat(shmid, 0, 0);
-	returnlicense(license());
-	
-	printf("nlicenses: %d\n", shmp->nlicenses);
 
 	// Reference: Lecture video, https://www.geeksforgeeks.org/bakery-algorithm-in-process-synchronization/
 	// Bakery algorithm 
@@ -190,6 +188,7 @@ void child(int id, char* arg1, char* arg2, char* arg3){
 	exit(0);
 }
 
+// Deallocates shared memory
 void deallocate(){
 	struct shmseg *shmp;
     int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
@@ -210,6 +209,7 @@ void deallocate(){
 	printf("Shared memory deallocated.\n");
 }
 
+// Returns the shared memory segment / license object
 struct shmseg* license(){
 	struct shmseg *shmp;
     int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
@@ -221,16 +221,22 @@ struct shmseg* license(){
 	return shmp;
 }
 
+// Blocks process until a license is avaliable
 void getlicense(struct shmseg* shmp){
-	while(shmp->nlicenses < 1);
+	if (shmp->nlicenses < 1){
+		printf("Child %d waiting for avaliable license...\n", getpid());
+		while(shmp->nlicenses < 1);
+	}
 }
 
+// Increments license #
 void returnlicense(struct shmseg* shmp){
 	shmp->nlicenses++;
 }
 
-void initlicense(struct shmseg* shmp){
-	shmp->nlicenses = 0;
+// Initializes license object with n licenses
+void initlicense(struct shmseg* shmp, int n){
+	shmp->nlicenses = n;
 	int i;
 	for (i = 0; i < MAX_PRO; i++) {
 		shmp->choosing[i] = 0;
@@ -238,15 +244,22 @@ void initlicense(struct shmseg* shmp){
 	}
 }
 
+// Increments n licenses
 void addtolicenses(struct shmseg* shmp, int n){
 	shmp->nlicenses += n;
 }
 
+// Decrements n licenses
 void removelicenses(struct shmseg* shmp, int n){
 	shmp->nlicenses -= n;
 }
 
+// Runs testsim & various license functions
 void docommand(char* arg1, char* arg2, char* arg3){
+	// Request license
+	getlicense(license());
+	removelicenses(license(),1);
+	printf("Fetched license. Remaining licenses: %d\n", license()->nlicenses);
 	
 	int pid;
 	int childpid;
@@ -269,5 +282,9 @@ void docommand(char* arg1, char* arg2, char* arg3){
 		break;
 	}
 	
+	// Wait for grandchild execl 
 	while ((childpid = (wait(NULL))) > 0);
+	
+	// Return license
+	returnlicense(license());
 }
