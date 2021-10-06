@@ -32,25 +32,32 @@ struct shmseg {
    char buf[BUF_SIZE];
 };
 
-void sigint(int sig){
-	printf("Parent process %d exiting...\n",getpid());
-	parent();
+void sigint_parent(int sig){
+	printf("Process %d exiting...\n",getpid());
 	deallocate();
-	//kill(0, SIGINT);
+	printf("Terminating child processes...\n");
+	kill(0, SIGINT);
+	parent();
+	exit(0);
+}
+
+void sigint(int sig){
+	kill(0, SIGINT);
 	exit(0);
 }
 
 void sigalrm(int sig){
 	printf("Program timed out.\n");
-	parent();
 	deallocate();
-	//kill(0, SIGINT);
+	printf("Terminating child processes...\n");
+	kill(0, SIGINT);
+	parent();
 	exit(0);
 }
 
 int main(int argc, char** argv) {
 	// Signal handlers;
-	signal(SIGINT, sigint);
+	signal(SIGINT, sigint_parent);
 	signal(SIGALRM, sigalrm);
 	alarm(MAX_TIME);
 	
@@ -89,6 +96,10 @@ int main(int argc, char** argv) {
 	}
 	if (optind < argc) {
 		licenseLimit = atoi(argv[optind]);
+		if (licenseLimit > MAX_PRO - 2){
+			perror("License number too large");
+			return -1;
+		}
 	}
 	else {
 		printf("Defaulting license # to 1.\n");
@@ -152,7 +163,7 @@ void parent(){
 // Reference: http://www.cs.umsl.edu/~sanjiv/classes/cs4760/src/shm.c
 // Reference: https://www.geeksforgeeks.org/signals-c-set-2/
 void child(int id, char* arg1, char* arg2, char* arg3){
-	signal(SIGINT, SIG_IGN);
+	signal(SIGINT, sigint);
 	signal(SIGALRM, SIG_IGN);
 	
 	printf("Child %d with id # %d forked from parent %d.\n",getpid(), id, getppid());
