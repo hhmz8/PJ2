@@ -25,6 +25,7 @@ runsim.c
 #define SHM_KEY 806040
 #define MAX_PRO 20
 #define MAX_TIME 60
+#define OUT_FILE "logfile"
 
 extern int errno;
 
@@ -37,6 +38,7 @@ struct shmseg {
 
 int main(int argc, char** argv) {
 	
+	FILE* fptr;
 	int i;
 	int id = -1;
 	int pid;
@@ -48,6 +50,10 @@ int main(int argc, char** argv) {
 	fscanf(stdin, "%s", arg1);
 	fscanf(stdin, "%s", arg2);
 	fscanf(stdin, "%s", arg3);
+	
+	// Clear log file
+	fptr = fopen(OUT_FILE, "w");
+	fclose(fptr);
 
 	// Reference: https://www.gnu.org/software/libc/manual/html_node/Example-of-Getopt.html
 	while ((option = getopt(argc, argv, "ht:")) != -1) {
@@ -77,7 +83,6 @@ int main(int argc, char** argv) {
 	
 	// Fork
 	for (i = 0; i < licenseLimit; i++){
-		printf("Forking child with parameters: %s %s %s.\n", arg1, arg2, arg3);
 		pid = fork();
 		id++; // Temporary process number
 		fscanf(stdin, "%s", arg1);
@@ -214,6 +219,10 @@ struct shmseg* license(){
 	}
 	shmp = shmat(shmid, 0, 0);
 	return shmp;
+}
+
+void getlicense(struct shmseg* shmp){
+	while(shmp->nlicenses < 1);
 }
 
 void returnlicense(struct shmseg* shmp){

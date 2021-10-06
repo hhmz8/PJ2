@@ -13,9 +13,11 @@ testsim.c
 #include <time.h>
 #include <ctype.h> //isprint
 #include <unistd.h> //sleep
+#define OUT_FILE "logfile"
 
 int main(int argc, char** argv){
-	
+	FILE* fptr;
+	fptr = fopen(OUT_FILE, "a");
 	if (argc != 3) {
 		perror("Error: Testsim requires 2 arguments.");
 		return -1;
@@ -30,7 +32,9 @@ int main(int argc, char** argv){
 		char timeBuffer[40];
 		time_t tempTime = time(NULL);
 		strftime(timeBuffer, 40, "%H:%M:%S", localtime(&tempTime));
-		printf("%s %d %d of %d iterations\n", timeBuffer, pid, (i+1), repeat);
+		printf("Saving: %s %d %d of %d iterations\n", timeBuffer, pid, (i+1), repeat);
+		fprintf(fptr, "%s %d %d of %d iterations\n", timeBuffer, pid, (i+1), repeat);
 	}
+	fclose(fptr);
 	return 0;
 }
